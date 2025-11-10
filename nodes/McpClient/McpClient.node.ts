@@ -45,7 +45,12 @@ function jsonPropToZod(prop: any) {
 
 	switch (prop.type) {
 		case 'string':
-			zodType = z.string();
+			if(prop.enum) {
+				zodType = z.enum(prop.enum);
+			}
+			else {
+				zodType = z.string();
+			}
 			break;
 		case 'number':
 			zodType = z.number();
