@@ -62,12 +62,10 @@ function jsonPropToZod(prop: any) {
 			zodType = z.boolean();
 			break;
 		case 'array':
-			if (prop.items?.type === 'string') {
-				zodType = z.array(z.string());
-			} else if (prop.items?.type === 'number') {
-				zodType = z.array(z.number());
-			} else if (prop.items?.type === 'boolean') {
-				zodType = z.array(z.boolean());
+			if (prop.items?.type) {
+				zodType = z.array(
+					jsonPropToZod(prop.items)
+				)
 			} else {
 				zodType = z.array(z.any());
 			}
