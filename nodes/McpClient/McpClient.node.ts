@@ -20,6 +20,67 @@ declare const process: {
 	env: Record<string, string | undefined>;
 };
 
+function jsonObjectToZod(obj: any) {
+	return z.object(
+		Object.entries(obj.properties).reduce(
+			(acc: any, [key, prop]: [string, any]) => {
+				let zodType = jsonPropToZod(prop);
+
+				if (!obj.required?.includes(key)) {
+					zodType = zodType.optional();
+				}
+
+				return {
+					...acc,
+					[key]: zodType,
+				};
+			},
+			{},
+		),
+	)
+}
+
+function jsonPropToZod(prop: any) {
+	let zodType: z.ZodType;
+
+	switch (prop.type) {
+		case 'string':
+			zodType = z.string();
+			break;
+		case 'number':
+			zodType = z.number();
+			break;
+		case 'integer':
+			zodType = z.number().int();
+			break;
+		case 'boolean':
+			zodType = z.boolean();
+			break;
+		case 'array':
+			if (prop.items?.type === 'string') {
+				zodType = z.array(z.string());
+			} else if (prop.items?.type === 'number') {
+				zodType = z.array(z.number());
+			} else if (prop.items?.type === 'boolean') {
+				zodType = z.array(z.boolean());
+			} else {
+				zodType = z.array(z.any());
+			}
+			break;
+		case 'object':
+			zodType = jsonObjectToZod(prop);
+			break;
+		default:
+			zodType = z.any();
+	}
+
+	if (prop.description) {
+		zodType = zodType.describe(prop.description);
+	}
+
+	return zodType;
+}
+
 export class McpClient implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'MCP Client',
@@ -440,58 +501,7 @@ export class McpClient implements INodeType {
 
 					const aiTools = tools.map((tool: any) => {
 						const paramSchema = tool.inputSchema?.properties
-							? z.object(
-								Object.entries(tool.inputSchema.properties).reduce(
-									(acc: any, [key, prop]: [string, any]) => {
-										let zodType: z.ZodType;
-
-										switch (prop.type) {
-											case 'string':
-												zodType = z.string();
-												break;
-											case 'number':
-												zodType = z.number();
-												break;
-											case 'integer':
-												zodType = z.number().int();
-												break;
-											case 'boolean':
-												zodType = z.boolean();
-												break;
-											case 'array':
-												if (prop.items?.type === 'string') {
-													zodType = z.array(z.string());
-												} else if (prop.items?.type === 'number') {
-													zodType = z.array(z.number());
-												} else if (prop.items?.type === 'boolean') {
-													zodType = z.array(z.boolean());
-												} else {
-													zodType = z.array(z.any());
-												}
-												break;
-											case 'object':
-												zodType = z.record(z.string(), z.any());
-												break;
-											default:
-												zodType = z.any();
-										}
-
-										if (prop.description) {
-											zodType = zodType.describe(prop.description);
-										}
-
-										if (!tool.inputSchema?.required?.includes(key)) {
-											zodType = zodType.optional();
-										}
-
-										return {
-											...acc,
-											[key]: zodType,
-										};
-									},
-									{},
-								),
-							)
+							? jsonObjectToZod(tool.inputSchema)
 							: z.object({});
 
 						return new DynamicStructuredTool({
